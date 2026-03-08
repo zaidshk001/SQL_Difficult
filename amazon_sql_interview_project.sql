@@ -166,6 +166,15 @@ INSERT INTO agent_logs VALUES
 -- 1. Customers who purchased on exactly 3 days last month
 
 # Method 1
+Select
+customer_id
+From purchases
+group by 1
+HAVING Min(purchase_date) >= '2026-01-01'
+AND MIN(purchase_date) < '2026-02-01'
+AND COUNT(Distinct purchase_date) = 3;
+
+# Method 2
 Select Max(Order_date) as last_order_date From orders;
 SELECT customer_id
 FROM purchases
@@ -174,7 +183,7 @@ WHERE MONTH(purchase_date) = MONTH('2026-02-05' - INTERVAL 1 MONTH)
 GROUP BY customer_id
 HAVING COUNT(DISTINCT purchase_date) = 3;   -- this is less efficient as functions are used in the WHere Clause and index is not happening 
 
-# Method 2
+# Method 3
 WITH last_month_purchases AS (
     SELECT 
         customer_id,
