@@ -452,3 +452,256 @@ FROM agent_logs
 WHERE DATE(login_time) <> DATE(logout_time);
 
 -- ==========================================================
+
+-- 16. remove the duplicate rows, so rows with identical souce and destination with same price are considered identical
+
+CREATE TABLE routes (
+    source VARCHAR(50),
+    destination VARCHAR(50),
+    price INT
+);
+
+INSERT INTO routes VALUES
+('mumbai', 'hyderabad', 10000),
+('hyderabad', 'mumbai', 10000),
+('bangalore', 'chennai', 6000),
+('pune', 'kolkata', 8000),
+('kolkata', 'pune', 8000),
+('mumbai', 'hyderabad', 12000),  -- different price
+('chennai', 'bangalore', 6000),  -- reverse duplicate
+('delhi', 'goa', 9000);
+
+
+Select * From routes;
+
+with cte as (
+    SELECT 
+        CASE 
+            WHEN source < destination THEN source 
+            ELSE destination 
+        END AS source,
+        CASE 
+            WHEN source < destination THEN destination 
+            ELSE source 
+        END AS destination,
+        price
+    FROM routes)
+    
+Select Distinct *
+From cte;
+
+--  method 2
+    Select 
+    LEAST(source, destination) AS source, -- smaller value 
+    GREATEST(source, destination) AS destination, -- larger value
+    MIN(price) as price -- If price can differ, we may need GROUP BY and decide which price to keep (MIN/MAX/AVG).
+FROM routes
+GROUP BY 1,2;
+
+-- ==========================================================
+
+-- 17. /*
+Assign each student a grade based on their marks using the grades table.
+For students with grade > 7, display:
+student name
+marks
+grade
+
+For students with grade ≤ 7, display:
+NULL as student name
+marks
+grade
+*/
+-- Grades table (range-based)
+CREATE TABLE grades (
+    grade INT,
+    min_marks INT,
+    max_marks INT
+);
+
+-- Students table
+CREATE TABLE students (
+    student VARCHAR(50),
+    marks INT
+);
+
+
+-- Insert grade ranges
+INSERT INTO grades (grade, min_marks, max_marks) VALUES
+(1, 0, 10),
+(2, 11, 20),
+(3, 21, 30),
+(4, 31, 40),
+(5, 41, 50),
+(6, 51, 60),
+(7, 61, 70),
+(8, 71, 80),
+(9, 81, 90),
+(10, 91, 100);
+
+
+-- Insert students
+INSERT INTO students (student, marks) VALUES
+('zaid', 90),
+('ubed', 70),
+('zainab', 60),
+('moin', 80),
+('zuha', 85);
+
+
+Select * From grades;
+Select * From students;
+
+
+Select 
+Case when grade > 7 Then student Else Null end as student,
+marks, grade
+From grades g
+Join students s
+ON s.marks Between g.min_marks ANd g.max_marks
+order by 1 Desc;
+
+-- ==========================================================
+
+-- 17. get the top 5 and bottom 5 person based on salary
+
+CREATE TABLE employees1 (
+    emp_id INT,
+    emp_name VARCHAR(50),
+    salary INT
+);
+
+INSERT INTO employees1 VALUES
+(1, 'A', 50000),
+(2, 'B', 70000),
+(3, 'C', 30000),
+(4, 'D', 90000),
+(5, 'E', 40000),
+(6, 'F', 80000),
+(7, 'G', 20000),
+(8, 'H', 100000),
+(9, 'I', 60000),
+(10, 'J', 25000),
+(11, 'K', 75000),
+(12, 'L', 35000);
+Select *
+from (
+Select *, row_number() over (order by salary Desc) as top,
+row_number() over (order by salary) as bottom
+ from employees1
+ ) as a
+ Where top <= 5 Or bottom <= 5; 
+ 
+
+-- ==========================================================
+
+-- 18.  /* You are given a table linkedin_users containing employment history of users.
+
+Write a SQL query to find how many users worked at Microsoft and then immediately joined Google next (no company in between). */
+
+CREATE TABLE linkedin_users (
+    user_id INT,
+    employer VARCHAR(50),
+    position VARCHAR(50),
+    start_date DATE,
+    end_date DATE
+);
+
+INSERT INTO linkedin_users VALUES
+(1, 'Microsoft', 'SDE', '2020-01-01', '2021-01-01'),
+(1, 'Google', 'SDE', '2021-02-01', '2022-01-01'),
+(2, 'Microsoft', 'SDE', '2019-01-01', '2020-01-01'),
+(2, 'Amazon', 'SDE', '2020-02-01', '2021-01-01'),
+(3, 'Microsoft', 'SDE', '2018-01-01', '2019-01-01'),
+(3, 'Google', 'SDE', '2019-02-01', '2020-01-01'),
+(4, 'Google', 'SDE', '2020-01-01', '2021-01-01');
+
+Select * from linkedin_users;
+
+with cte as(
+Select *, Lead(employer) over (partition by user_id order by start_date) as next_employer
+From linkedin_users)
+
+Select COUNT(DIstinct user_id) as count
+from cte 
+Where employer = 'Microsoft'
+ANd next_employer = 'Google';
+
+-- ==========================================================
+
+-- 19.  /* Given a friendship table where each row represents a connection:
+
+Find the average number of friends per user.*/
+
+CREATE TABLE google_friends_network (
+    user_id INT,
+    friend_id INT
+);
+
+INSERT INTO google_friends_network VALUES
+(1,2),
+(2,1),
+(1,3),
+(3,1),
+(2,3),
+(3,2),
+(4,1);
+
+Select * from google_friends_network;
+
+with cte as (
+    SELECT user_id, friend_id FROM google_friends_network
+    UNION ALL
+    SELECT friend_id AS user_id, user_id AS friend_id 
+    FROM google_friends_network),
+
+cte1 as (
+Select user_id, COunt(Distinct friend_id) as count
+From cte 
+Group by 1)
+
+Select
+Avg(count) as arpu
+From cte1;
+
+-- “We can use LEAST/GREATEST to remove duplicate friendship pairs, but for counting friends per user 
+-- we need directional relationships, so UNION is required to ensure each user gets all their connections.”
+
+-- ==========================================================
+
+-- 20.  /*Given match data with Team_1, Team_2, and Winner, generate:
+team_name
+matches_played
+matches_won
+matches_lost */
+
+Create table matches (
+    team_1 VARCHAR(50),
+    team_2 VARCHAR(50),
+    winner VARCHAR(50)
+);
+
+INSERT INTO matches VALUES
+('India', 'SL', 'India'),
+('SL', 'Aus', 'Aus'),
+('SA', 'Eng', 'Eng'),
+('Eng', 'NZ', 'NZ'),
+('Aus', 'India', 'India');
+
+Select * from matches;
+
+with cte as (
+Select team_1 as team, winner
+From matches
+Union ALl
+Select team_2 as team,
+winner
+From matches)
+
+Select
+team,
+COUNT(team) as match_played,
+SUM(Case When team = winner then 1 else 0 end) as match_won,
+COUNT(team) - SUM(Case When team = winner then 1 else 0 end) as match_lost
+from cte
+Group by 1
